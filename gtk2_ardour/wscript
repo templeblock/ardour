@@ -507,11 +507,11 @@ def build(bld):
             obj.use += [ 'X11' ]
 
     # Tool to test libcanvas
-    if re.search ("linux", sys.platform) != None and bld.env['CANVASTESTUI']:
+    if bld.env['build_target'] != 'mingw' and bld.env['CANVASTESTUI']:
         obj = bld (features = 'cxx c cxxprogram')
         obj.install_path = None
         obj.source    = list(gtk2_ardour_sources)
-        obj.source    = [ 'ardour_button.cc', 'ui_config.cc', 'tooltips.cc' ]
+        obj.source    = [ 'ardour_button.cc', 'ui_config.cc', 'tooltips.cc', 'ardour_http.cc' ]
         obj.target    = 'canvas_test'
         obj.includes  = ['.', '../libs']
         obj.ldflags   = ['-no-undefined']
@@ -534,8 +534,13 @@ def build(bld):
                 ]
         obj.linkflags = ''
         obj.uselib    = 'UUID FLAC FONTCONFIG GLIBMM GTHREAD GTK OGG CURL DL GTKMM CANVAS FFTW3F LO TAGLIB XML '
-        # obj.source += [ 'canvas_test.cc', ]
-        obj.source += [ 'toolbar_test.cc', 'enums.cc']
+        obj.source += [ 'canvas_test.cc' ]
+        #obj.source += [ 'toolbar_test.cc', 'enums.cc']
+
+    if sys.platform == 'darwin':
+        obj.source += [ 'cocoacarbon.mm', 'bundle_env_cocoa.cc' ]
+    else:
+        obj.source += [ 'bundle_env_linux.cc' ]
 
 
     if bld.is_defined('WINDOWS_VST_SUPPORT') and bld.env['build_target'] != 'mingw':

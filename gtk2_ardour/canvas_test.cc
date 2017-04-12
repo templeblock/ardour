@@ -1,6 +1,7 @@
 #include <glibmm.h>
 #include <gtkmm/main.h>
 #include <gtkmm/box.h>
+#include <gtkmm/menu.h>
 #include <gtkmm/window.h>
 
 #include "pbd/debug.h"
@@ -30,6 +31,7 @@
 #include "canvas/widget.h"
 
 #include "ardour_button.h"
+#include "bundle_env.h"
 #include "ui_config.h"
 
 #include "pbd/i18n.h"
@@ -42,7 +44,8 @@ using namespace Gtk;
 
 #include "ardour/vst_types.h"
 
-static const char* localedir = LOCALEDIR;
+static string localedir (LOCALEDIR);
+
 int vstfx_init (void*) { return 0; }
 void vstfx_exit () {}
 void vstfx_destroy_editor (VSTState*) {}
@@ -102,7 +105,12 @@ public:
 private:
 	int starting ();
 	bool main_window_delete_event (GdkEventAny* ev) { finish (); return true; }
+
 	void finish () { quit (); }
+	bool popup_menu1 (GdkEventButton*);
+	bool popup_menu2 (GdkEventButton*);
+	void menu1_clicked (int i) { printf ("Clicked Menu1: %d\n", i); }
+	void menu2_clicked (int i) { printf ("Clicked Menu1: %d\n", i); }
 	Gtk::Window _main_window;
 
 	ArdourCanvas::Container* initialize_canvas (ArdourCanvas::Canvas& canvas);
@@ -115,12 +123,17 @@ private:
 	ArdourCanvas::Grid* grid;
 
 	ArdourButton test_button;
+	ArdourButton menu_button1;
+	ArdourButton menu_button2;
+	Gtk::Menu  menu1;
+	Gtk::Menu* menu2;
 };
 
 /* ***************************************************************************/
 
 CANVAS_UI::CANVAS_UI (int *argcp, char **argvp[], const char* localedir)
 	: Gtkmm2ext::UI (PROGRAM_NAME, X_("gui"), argcp, argvp)
+	, menu2 (0)
 {
 	Gtkmm2ext::init (localedir);
 	UIConfiguration::instance().post_gui_init ();
@@ -134,15 +147,14 @@ CANVAS_UI::CANVAS_UI (int *argcp, char **argvp[], const char* localedir)
 	VBox* b = manage (new VBox);
 	Label* l = manage (new Label ("Hello there"));
 
+	test_button.signal_clicked.connect (sigc::mem_fun (*this, &CANVAS_UI::finish));
+	test_button.set_text ("Don't click me");
+
 	canvas = new ArdourCanvas::GtkCanvas ();
 	group = initialize_canvas (*canvas);
 
 	canvas->signal_size_request().connect (sigc::mem_fun (*this, &CANVAS_UI::canvas_size_request));
 	canvas->signal_size_allocate().connect (sigc::mem_fun (*this, &CANVAS_UI::canvas_size_allocated));
-	test_button.signal_clicked.connect (sigc::mem_fun (*this, &CANVAS_UI::finish));
-
-	test_button.set_text ("Don't click me");
-
 	b->pack_start (*l, false, 0);
 	b->pack_start (*canvas, true, 0);
 
@@ -162,6 +174,34 @@ CANVAS_UI::starting ()
 	return 0;
 }
 
+bool
+CANVAS_UI::popup_menu1 (GdkEventButton* ev)
+{
+	Gtkmm2ext::anchored_menu_popup(&menu1, &menu_button1, "", 1, ev->time);
+	return true;
+}
+
+bool
+CANVAS_UI::popup_menu2 (GdkEventButton* ev)
+{
+	using namespace Menu_Helpers;
+	if (menu2 == 0) {
+		menu2 = new Gtk::Menu;
+		MenuList& items = menu2->items();
+
+		items.push_back (MenuElem ("-inf .. +0dBFS"));
+		items.push_back (MenuElem ("-10dB .. +0dBFS"));
+		items.push_back (MenuElem ("-4 .. +0dBFS"));
+		items.push_back (SeparatorElem());
+		items.push_back (MenuElem ("-inf .. -2dBFS"));
+		items.push_back (MenuElem ("-10dB .. -2dBFS"));
+		items.push_back (MenuElem ("-4 .. -2dBFS"));
+	}
+
+	menu2->popup (1, ev->time);
+	return true;
+}
+
 ArdourCanvas::Container*
 CANVAS_UI::initialize_canvas (ArdourCanvas::Canvas& canvas)
 {
@@ -173,57 +213,53 @@ CANVAS_UI::initialize_canvas (ArdourCanvas::Canvas& canvas)
 
 	grid = new ArdourCanvas::Grid (scroll_group);
 
-	grid->set_padding (40.0);
+	grid->set_padding (10.0);
 	grid->set_margin (0.0);
 
 	grid->set_outline_width (3.0);
 	grid->set_outline_color (Color (0x3daec1ff));
 	grid->set_outline (false);
-	grid->set_row_spacing (60.0);
+	grid->set_row_spacing (3.0);
 	grid->set_col_spacing (3.0);
 	grid->set_homogenous (false);
 
-	ArdourCanvas::Text* text1 = new ArdourCanvas::Text (&canvas);
-	text1->set ("hello, world");
-	text1->set_color (Color (0xff0000ff));
+	menu_button1.set_text ("Menu 1");
+	menu_button1.signal_button_press_event().connect (sigc::mem_fun (*this, &CANVAS_UI::popup_menu1), false);
 
-	ArdourCanvas::Text* text2 = new ArdourCanvas::Text (&canvas);
-	text2->set ("goodbye, cruel world");
-	text2->set_color (Color (0x00ff00ff));
+	menu_button2.set_text ("Menu 2");
+	menu_button2.signal_button_press_event().connect (sigc::mem_fun (*this, &CANVAS_UI::popup_menu2), false);
 
-	ArdourCanvas::Text* text3 = new ArdourCanvas::Text (&canvas);
-	text3->set ("I am the third");
-	text3->set_color (Color (0xff00ffff));
-
-	ArdourCanvas::Text* text4 = new ArdourCanvas::Text (&canvas);
-	text4->set ("I am fourth");
-	text4->set_color (Color (0xffff00ff));
-
-	grid->place (text1, 0, 0, 2, 1);
-	grid->place (text2, 2, 0);
-	grid->place (text3, 0, 2, 1, 2);
-	grid->place (text4, 1, 3);
-
-	ArdourButton* button1 = new ArdourButton ("auto-return");
-	ArdourButton* button2 = new ArdourButton ("auto-play");
-	ArdourButton* button3 = new ArdourButton ("follow range");
-	ArdourButton* button4 = new ArdourButton ("auto-input");
-
-	ArdourCanvas::Widget* w1 = new ArdourCanvas::Widget (&canvas, *button1);
+	ArdourCanvas::Widget* w1 = new ArdourCanvas::Widget (&canvas, menu_button1);
 	CANVAS_DEBUG_NAME (w1, "w1");
-	grid->place (w1, 3, 0, 2, 0);
-	ArdourCanvas::Widget* w2 = new ArdourCanvas::Widget (&canvas, *button2);
+	grid->place (w1, 0, 0, 1, 0);
+	ArdourCanvas::Widget* w2 = new ArdourCanvas::Widget (&canvas, menu_button2);
 	CANVAS_DEBUG_NAME (w2, "w2");
-	grid->place (w2, 5, 0, 2, 0);
-	ArdourCanvas::Widget* w3 = new ArdourCanvas::Widget (&canvas, *button3);
+	grid->place (w2, 1, 0, 1, 0);
+	ArdourCanvas::Widget* w3 = new ArdourCanvas::Widget (&canvas, test_button);
 	CANVAS_DEBUG_NAME (w3, "w3");
-	grid->place (w3, 3, 1);
-	ArdourCanvas::Widget* w4 = new ArdourCanvas::Widget (&canvas, *button4);
-	CANVAS_DEBUG_NAME (w4, "w4");
-	grid->place (w4, 4, 1);
+	grid->place (w3, 0, 1, 2, 0);
 
-	//ArdourCanvas::Widget* w = new ArdourCanvas::Widget (scroll_group, test_button);
-	//CANVAS_DEBUG_NAME (w, "TheW");
+	using namespace Menu_Helpers;
+
+	menu1.set_name ("ArdourContextMenu");
+	menu1.set_reserve_toggle_size(false);
+
+	menu1.items().clear ();
+	menu1.items().push_back (MenuElem(_("Input"),
+	 sigc::bind (sigc::mem_fun (*this,
+	 &CANVAS_UI::menu1_clicked), 0)));
+	menu1.items().push_back (MenuElem(_("Pre Fader"),
+	 sigc::bind (sigc::mem_fun (*this,
+	 &CANVAS_UI::menu1_clicked), 1)));
+	menu1.items().push_back (MenuElem(_("Post Fader"),
+	 sigc::bind (sigc::mem_fun (*this,
+	 &CANVAS_UI::menu1_clicked), 2)));
+	menu1.items().push_back (MenuElem(_("Output"),
+	 sigc::bind (sigc::mem_fun (*this,
+	 &CANVAS_UI::menu1_clicked), 3)));
+	menu1.items().push_back (MenuElem(_("Custom"),
+	 sigc::bind (sigc::mem_fun (*this,
+	 &CANVAS_UI::menu1_clicked), 4)));
 
 	return new ArdourCanvas::Container (scroll_group);
 }
@@ -248,13 +284,13 @@ static CANVAS_UI  *ui = 0;
 
 int main (int argc, char **argv)
 {
-#if 0
+#if 1
 	fixup_bundle_environment (argc, argv, localedir);
 	load_custom_fonts();
 	// TODO setlocale..
 #endif
 
-	if (!ARDOUR::init (false, true, localedir)) {
+	if (!ARDOUR::init (false, true, localedir.c_str())) {
 		cerr << "Ardour failed to initialize\n" << endl;
 		::exit (EXIT_FAILURE);
 	}
@@ -278,7 +314,7 @@ int main (int argc, char **argv)
 	// we could load a session here, if needed
 	// see ../session_utils/common.cc
 
-	ui = new CANVAS_UI (&argc, &argv, localedir);
+	ui = new CANVAS_UI (&argc, &argv, localedir.c_str());
 	ui->run (log_receiver);
 
 	info << "Farewell" << endmsg;

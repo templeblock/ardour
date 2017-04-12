@@ -238,6 +238,7 @@ MAIN_EXECUTABLE=Ardour.bin  ## used in startup_script
 
 echo "Copying ardour executable ...."
 cp $BUILD_ROOT/gtk2_ardour/ardour-$release_version $APPROOT/MacOS/$MAIN_EXECUTABLE
+cp $BUILD_ROOT/gtk2_ardour/canvas_test $APPROOT/MacOS/
 if test x$SAE != x ; then
     # cp $BUILD_ROOT/gtk2_ardour/evtest $APPROOT/MacOS/gtkevents
     cp  Ardour3-SAE.icns $Resources/appIcon.icns
@@ -529,6 +530,10 @@ if test "$HAVE_SESSION_UTILS" = true ; then
 		BN=$(basename $file)
 		executables="$executables ../lib/${BN}"
 	done
+fi
+
+if test -f "$APPROOT/MacOS/canvas_test"; then
+	executables="$executables canvas_test"
 fi
 
 if test -f "$Frameworks/ardour-vst-scanner"; then
