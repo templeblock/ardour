@@ -579,6 +579,8 @@ public:
         bool slaved_to (boost::shared_ptr<VCA>) const;
         bool slaved () const;
 
+	virtual void use_captured_sources (SourceList& srcs, CaptureInfos const &) {}
+
   protected:
         friend class Session;
 
